@@ -194,7 +194,7 @@ export class PythonEnvManager extends EventEmitter {
     }
 
     console.warn('[PythonEnvManager] Bootstrapping pip...');
-    return new Promise((resolve) => {
+    const bootstrapSuccess = await new Promise<boolean>((resolve) => {
       const proc = spawn(venvPython, ['-m', 'ensurepip'], {
         cwd: this.autoBuildSourcePath!,
         stdio: 'pipe'
@@ -220,7 +220,43 @@ export class PythonEnvManager extends EventEmitter {
         resolve(false);
       });
     });
+
+    if (!bootstrapSuccess) {
+      return false;
+    }
+
+    // Upgrade pip to latest version - old pip versions (e.g., 21.2.4) can't resolve modern packages
+    console.warn('[PythonEnvManager] Upgrading pip to latest version...');
+    this.emit('status', 'Upgrading pip...');
+    return new Promise((resolve) => {
+      const proc = spawn(venvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], {
+        cwd: this.autoBuildSourcePath!,
+        stdio: 'pipe'
+      });
+
+      let stderr = '';
+      proc.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          console.warn('[PythonEnvManager] Pip upgraded successfully');
+          resolve(true);
+        } else {
+          // Non-fatal - old pip might still work for some packages
+          console.warn('[PythonEnvManager] Pip upgrade failed (non-fatal):', stderr);
+          resolve(true); // Continue anyway
+        }
+      });
+
+      proc.on('error', (err) => {
+        console.warn('[PythonEnvManager] Error upgrading pip (non-fatal):', err);
+        resolve(true); // Continue anyway
+      });
+    });
   }
+
 
   /**
    * Install dependencies from requirements.txt using python -m pip
