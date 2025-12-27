@@ -39,6 +39,7 @@ interface TerminalState {
   addTerminal: (cwd?: string, projectPath?: string) => Terminal | null;
   addRestoredTerminal: (session: TerminalSession) => Terminal;
   removeTerminal: (id: string) => void;
+  removeTerminals: (ids: string[]) => void;
   updateTerminal: (id: string, updates: Partial<Terminal>) => void;
   setActiveTerminal: (id: string | null) => void;
   setTerminalStatus: (id: string, status: TerminalStatus) => void;
@@ -131,6 +132,26 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const newActiveId = state.activeTerminalId === id
         ? (newTerminals.length > 0 ? newTerminals[newTerminals.length - 1].id : null)
         : state.activeTerminalId;
+
+      return {
+        terminals: newTerminals,
+        activeTerminalId: newActiveId,
+      };
+    });
+  },
+
+  removeTerminals: (ids: string[]) => {
+    // Clean up buffer manager for all removed terminals
+    ids.forEach(id => terminalBufferManager.dispose(id));
+
+    set((state) => {
+      const newTerminals = state.terminals.filter((t) => !ids.includes(t.id));
+      
+      // If active terminal is being removed, switch to the last remaining one
+      let newActiveId = state.activeTerminalId;
+      if (state.activeTerminalId && ids.includes(state.activeTerminalId)) {
+        newActiveId = newTerminals.length > 0 ? newTerminals[newTerminals.length - 1].id : null;
+      }
 
       return {
         terminals: newTerminals,
@@ -236,9 +257,9 @@ export async function restoreTerminalSessions(projectPath: string): Promise<void
 
     // Remove dead terminals from store (they have state but no PTY process)
     const deadTerminals = aliveChecks.filter(c => !c.alive);
-    for (const { terminal } of deadTerminals) {
-      debugLog(`[TerminalStore] Removing dead terminal: ${terminal.id}`);
-      store.removeTerminal(terminal.id);
+    if (deadTerminals.length > 0) {
+      debugLog(`[TerminalStore] Removing ${deadTerminals.length} dead terminals`);
+      store.removeTerminals(deadTerminals.map(d => d.terminal.id));
     }
 
     // If all terminals were alive, we're done

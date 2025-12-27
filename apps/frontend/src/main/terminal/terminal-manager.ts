@@ -283,7 +283,18 @@ export class TerminalManager {
    * Check if a terminal's PTY process is alive
    */
   isTerminalAlive(terminalId: string): boolean {
-    return this.terminals.has(terminalId);
+    const terminal = this.terminals.get(terminalId);
+    if (!terminal || !terminal.pty) {
+      return false;
+    }
+
+    try {
+      // Check if the process is actually running using signal 0
+      process.kill(terminal.pty.pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
