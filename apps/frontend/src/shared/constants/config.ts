@@ -22,6 +22,8 @@ export const DEFAULT_APP_SETTINGS = {
   defaultModel: 'opus',
   agentFramework: 'auto-claude',
   pythonPath: undefined as string | undefined,
+  gitPath: undefined as string | undefined,
+  githubCLIPath: undefined as string | undefined,
   autoBuildPath: undefined as string | undefined,
   autoUpdateAutoBuild: true,
   autoNameTerminals: true,
@@ -44,7 +46,9 @@ export const DEFAULT_APP_SETTINGS = {
   // UI Scale (default 100% - standard size)
   uiScale: UI_SCALE_DEFAULT,
   // Beta updates opt-in (receive pre-release versions)
-  betaUpdates: false
+  betaUpdates: false,
+  // Language preference (default to English)
+  language: 'en' as const
 };
 
 // ============================================
