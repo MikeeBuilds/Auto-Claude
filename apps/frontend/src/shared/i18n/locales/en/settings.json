@@ -33,6 +33,10 @@
       "title": "Integrations",
       "description": "API keys & Claude accounts"
     },
+    "api-profiles": {
+      "title": "API Profiles",
+      "description": "Custom API endpoint profiles"
+    },
     "updates": {
       "title": "Updates",
       "description": "Auto Claude updates"
@@ -318,6 +322,12 @@
     "noRecentErrors": "No recent errors",
     "helpTitle": "Reporting Issues",
     "helpText": "When reporting bugs, click \"Copy Debug Info\" to get system information and recent errors that help us diagnose the issue."
+  },
+  "projectSettings": {
+    "noProjectSelected": {
+      "title": "No Project Selected",
+      "description": "Select a project from the sidebar to configure its settings."
+    }
   },
   "mcp": {
     "title": "MCP Server Overview",
