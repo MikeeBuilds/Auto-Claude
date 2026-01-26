@@ -23,6 +23,7 @@ import {
 } from './ui/tooltip';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '../stores/settings-store';
+import { useClaudeProfileStore } from '../stores/claude-profile-store';
 import { detectProvider, getProviderLabel, getProviderBadgeColor, type ApiProvider } from '../../shared/utils/provider-detection';
 import { formatTimeRemaining, localizeUsageWindowLabel, hasHardcodedText } from '../../shared/utils/format-time';
 import type { ClaudeUsageSnapshot } from '../../shared/types/agent';
@@ -49,8 +50,13 @@ const OAUTH_FALLBACK = {
 } as const;
 
 export function AuthStatusIndicator() {
-  // Subscribe to profile state from settings store
+  // Subscribe to profile state from settings store (API profiles)
   const { profiles, activeProfileId } = useSettingsStore();
+
+  // Subscribe to Claude OAuth profile state
+  const claudeProfiles = useClaudeProfileStore((state) => state.profiles);
+  const activeClaudeProfileId = useClaudeProfileStore((state) => state.activeProfileId);
+
   const { t } = useTranslation(['common']);
 
   // Track usage data for warning badge
@@ -102,9 +108,21 @@ export function AuthStatusIndicator() {
 
   // Compute auth status and provider detection using useMemo to avoid unnecessary re-renders
   const authStatus = useMemo(() => {
+    console.log('[AuthStatusIndicator] Computing auth status:', {
+      activeProfileId,
+      apiProfilesCount: profiles.length,
+      activeClaudeProfileId,
+      claudeProfilesCount: claudeProfiles.length,
+      hasUsage: !!usage,
+      usageProfileEmail: usage?.profileEmail,
+      usageProfileName: usage?.profileName
+    });
+
+    // First check if user is using API profile auth (has active API profile)
     if (activeProfileId) {
       const activeProfile = profiles.find(p => p.id === activeProfileId);
       if (activeProfile) {
+        console.log('[AuthStatusIndicator] Using API profile:', activeProfile.name);
         // Detect provider from profile's baseUrl
         const provider = detectProvider(activeProfile.baseUrl);
         const providerLabel = getProviderLabel(provider);
@@ -119,12 +137,47 @@ export function AuthStatusIndicator() {
           badgeColor: getProviderBadgeColor(provider)
         };
       }
-      // Profile ID set but profile not found - fallback to OAuth
-      return OAUTH_FALLBACK;
     }
-    // No active profile - using OAuth
+
+    // No active API profile - check Claude OAuth profiles directly
+    if (activeClaudeProfileId && claudeProfiles.length > 0) {
+      const activeClaudeProfile = claudeProfiles.find(p => p.id === activeClaudeProfileId);
+      console.log('[AuthStatusIndicator] Active Claude profile:', activeClaudeProfile);
+      if (activeClaudeProfile) {
+        console.log('[AuthStatusIndicator] Using Claude OAuth profile:', {
+          id: activeClaudeProfile.id,
+          name: activeClaudeProfile.name,
+          email: activeClaudeProfile.email
+        });
+        return {
+          type: 'oauth' as const,
+          name: activeClaudeProfile.email || activeClaudeProfile.name,
+          provider: 'anthropic' as const,
+          providerLabel: 'Anthropic',
+          badgeColor: 'bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500/15'
+        };
+      }
+    }
+
+    // Fallback to usage data if Claude profiles aren't loaded yet
+    if (usage && (usage.profileName || usage.profileEmail)) {
+      console.log('[AuthStatusIndicator] Using usage data:', {
+        profileEmail: usage.profileEmail,
+        profileName: usage.profileName
+      });
+      return {
+        type: 'oauth' as const,
+        name: usage.profileEmail || usage.profileName,
+        provider: 'anthropic' as const,
+        providerLabel: 'Anthropic',
+        badgeColor: 'bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500/15'
+      };
+    }
+
+    // No auth info available - fallback to generic OAuth
+    console.log('[AuthStatusIndicator] Falling back to generic OAuth');
     return OAUTH_FALLBACK;
-  }, [activeProfileId, profiles]);
+  }, [activeProfileId, profiles, activeClaudeProfileId, claudeProfiles, usage]);
 
   // Helper function to truncate ID for display
   const truncateId = (id: string): string => {
@@ -258,6 +311,22 @@ export function AuthStatusIndicator() {
                         </div>
                       </div>
                     )}
+                  </div>
+                </>
+              )}
+
+              {/* Account details for OAuth profiles */}
+              {isOAuth && authStatus.name && authStatus.name !== 'OAuth' && (
+                <>
+                  <div className="pt-2 border-t space-y-2">
+                    {/* Account name/email with icon */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Lock className="h-3 w-3" />
+                        <span className="text-[10px]">{t('common:usage.account')}</span>
+                      </div>
+                      <span className="font-medium text-[10px]">{authStatus.name}</span>
+                    </div>
                   </div>
                 </>
               )}
